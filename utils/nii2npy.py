@@ -45,20 +45,40 @@ class ct_dataset(data.Dataset):
         img_path = os.path.join(self.img_dir, self.image[idx])
         label_path = os.path.join(self.img_dir, self.img_labels[idx])
         img = sitk.ReadImage(img_path)
-        img = sitk.GetArrayFromImage(img).astype("float32")
+        img = sitk.GetArrayFromImage(img).astype(float)
         label = sitk.ReadImage(label_path)
-        label = sitk.GetArrayFromImage(label).astype("float32")
-        img_add = 512 - img.shape[0]
-        if img_add < 0:
-            img_add = -img_add
-        label_add = 512 - label.shape[0]
-        if label_add < 0:
-            label_add = -label_add
-        img = np.resize(np.pad(img, ((img_add,0),(0,0), (0,0)), 'edge'), (1,512,512,512))
-        label = np.resize(np.pad(label, ((label_add,0), (0,0), (0,0)), 'edge'), (1,512,512,512))
+        label = sitk.GetArrayFromImage(label).astype(float)
+        img = np.pad(img, ((512 - img.shape[0],0),(0,0), (0,0)), 'constant')
+        label = np.pad(label, ((512 - img.shape[0],0), (0,0), (0,0)), 'constant')
         # if self.transform:
         #     image = self.transform(image)
         # if self.target_transform:
         #     label = self.target_transform(label)
-        return img, label
+        return img, label    
+    
+    
+if __name__ == "__main__":
+    import os
+    imagesTr = "/home/dxm/dxm/nnunet/nnUNet_raw_data_base/nnUNet_raw_data/Task100_mycardium/npy/imagesTr"
+    labelsTr = "/home/dxm/dxm/nnunet/nnUNet_raw_data_base/nnUNet_raw_data/Task100_mycardium/npy/labelsTr"
+    img_dir = "/home/dxm/dxm/nnunet/nnUNet_raw_data_base/nnUNet_raw_data/Task100_mycardium"
+    with open(os.path.join(img_dir,"dataset.json")) as f:
+        annotation = json.load(f)["training"]
+        image = []
+        img_labels = []
+        for i in annotation:
+            image.append(i["image"].replace("roi","roi_0000") )
+            img_labels.append(i["label"])
+    img_path = os.path.join(self.img_dir, self.image[idx])
+    label_path = os.path.join(self.img_dir, self.img_labels[idx])
+    img = sitk.ReadImage(img_path)
+    img = sitk.GetArrayFromImage(img).astype(float)
+    label = sitk.ReadImage(label_path)
+    label = sitk.GetArrayFromImage(label).astype(float)
+    img = np.pad(img, ((512 - img.shape[0],0),(0,0), (0,0)), 'constant')
+    label = np.pad(label, ((512 - img.shape[0],0), (0,0), (0,0)), 'constant')
+    print(image)
+    print(img_labels)
+    
+    
     
