@@ -21,7 +21,7 @@ class UNet3D(nn.Module):
         self.pool3 = nn.MaxPool3d(kernel_size=2, stride=2)
         self.encoder4 = UNet3D._block(features * 4, features * 8, name="enc4")
         self.pool4 = nn.MaxPool3d(kernel_size=2, stride=2)
-                
+        self.sigmod = nn.Sigmoid()
         self.bottleneck = UNet3D._block(features * 8, features * 16, name="bottleneck")
 
         self.upconv4 = nn.ConvTranspose3d(
@@ -50,10 +50,10 @@ class UNet3D(nn.Module):
         enc2 = self.encoder2(self.pool1(enc1))
         enc3 = self.encoder3(self.pool2(enc2))
         enc4 = self.encoder4(self.pool3(enc3))
-        breakpoint()
+        # breakpoint()
         flt = nn.Flatten()
         flt1 =  flt(enc4)
-        ffn = nn.Linear(flt1.shape[1], 1).cuda()
+        ffn = nn.Linear(flt1.shape[1], 2).cuda()
         ffn2 = nn.Sigmoid()
         ffn1 = ffn2(ffn(flt1))
         
@@ -72,7 +72,7 @@ class UNet3D(nn.Module):
         dec1 = torch.cat((dec1, enc1), dim=1)
         dec1 = self.decoder1(dec1)
         outputs = self.conv(dec1)
-        return outputs,ffn
+        return outputs,ffn1
 
     @staticmethod
     def _block(in_channels, features, name):

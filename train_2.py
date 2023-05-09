@@ -8,12 +8,14 @@ import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 sys.path.append("../")
 from data.dataloader import build_dataloader
+from data.dataloader import build_dataloader_h5
 from models.unet3D import UNet3D
 from torchsummary import summary
 from torch.nn.modules.loss import CrossEntropyLoss
 from torch.nn.modules.loss import MSELoss
 from torchmetrics import Dice
 from utils.loss import SoftDiceLoss
+from utils.loss import MixLoss
 from utils.metric import DiceScore
 def save_all_hparams(trainer, cfg):
     """
@@ -95,7 +97,8 @@ def run():
     # ------------
     #  /nfs/public/dxm/Task300_ischemic
     # /home/dxm/dxm/nnunet/nnUNet_raw_data_base/nnUNet_raw_data/Task100_mycardium
-    ct_dataloader = build_dataloader(img_dir = '/data2/dxm/Task300_ischemic', batch_size = 2)
+    save_dir = "/home/dxm/dxm/Datasets/Myocardial+Ischemic_h5py/Myocardial+Ischemic.h5"
+    ct_dataloader = build_dataloader_h5(save_dir, batch_size = 2)
     # for img, label in ct_dataloader:
     #     logger.debug("img shape is " + str(img.shape))
     #     logger.debug("label shape is: " +  str(label.shape))
@@ -103,6 +106,7 @@ def run():
     # ------------
     # model
     # ------------
+    
     net = UNet3D(in_channels=1, out_channels=1, init_features=2).cuda()
     summary(net, input_size = (1,512,512,512), batch_size = 4)
     optimizer = torch.optim.Adam(net.parameters(),lr=cfg.lr)
@@ -110,34 +114,38 @@ def run():
     mse = MSELoss().cuda()
     dice = Dice(average='micro').cuda()
     softdice = SoftDiceLoss().cuda()
+    mixloss = MixLoss().cuda()
     dicescore = DiceScore().cuda()
     if cfg.resume_from_checkpoint:
         net.load_state_dict(torch.load('ckpt/epoch_40_.pt'))
         logger.debug("load ckpt from: ckpt/epoch_40_.pt")
+        
     for e in range(cfg.max_epochs):
-        for img, label in  ct_dataloader:
+        for img, label1, label2 in  ct_dataloader:
+            # breakpoint()
             img = img.cuda()
-            label = label.cuda()
+            label1 = label1.cuda()
+            label2 = label2.cuda()
             optimizer.step()
             # logger.debug(img)
             # logger.debug(label)
-            outputs, ffn = net(img)
-            logger.debug(ffn)
-            
-            loss = softdice(outputs, label)
-            metric = dicescore(outputs, label)
+            outputs, ffn1 = net(img)
+            logger.debug(ffn1)
+            # breakpoint()
+            loss = mixloss(outputs, label1, ffn1, label2)
+            metric = dicescore(outputs, label1)
             logger.debug("loss: " + str(loss.item()))
             logger.debug("dice score: " + str(metric.item()))
             loss.backward()
             optimizer.step()
         from datetime import datetime
-        timestamp_str = datetime.now().strftime('%Y-%m-%d_%H:%M')
+        timestamp_str = datetime.now().strftime('%Y-%m-%d')
         
         if not e % cfg.save_ckpt_every_n_epoch:
             if os.path.exists(os.path.join(cfg.ckpt_path, timestamp_str)):
                 torch.save(net.state_dict(), os.path.join(cfg.ckpt_path, timestamp_str,"epoch_" + str(e) + "_.pt"))
             else:
-                os.path.mkdir(os.path.join(cfg.ckpt_path, timestamp_str))
+                os.mkdir(os.path.join(cfg.ckpt_path, timestamp_str))
                 torch.save(net.state_dict(), os.path.join(cfg.ckpt_path, timestamp_str,"epoch_" + str(e) + "_.pt"))
 
 

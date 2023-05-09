@@ -5,9 +5,12 @@ import torch.utils.data as data
 from torchvision.io import read_image
 import SimpleITK as sitk
 import numpy as np
+import h5py
 """
 img_dir = '/home/dxm/dxm/nnunet/nnUNet_raw_data_base/nnUNet_raw_data/Task100_mycardium'
 annotations_file = 'dataset.json'
+
+save_dir = "/home/dxm/dxm/Datasets/Myocardial+Ischemic_h5py/Myocardial+Ischemic.h5"
 """
 
 def build_dataloader(img_dir, batch_size = 8, train = True, transform=None, target_transform=None):
@@ -18,6 +21,13 @@ def build_dataloader(img_dir, batch_size = 8, train = True, transform=None, targ
                     num_workers = 8,pin_memory=False)
     return loader
 
+def build_dataloader_h5(img_dir, batch_size = 8, train = True, transform=None, target_transform=None):
+    """
+    return dataloader
+    """
+    loader = data.DataLoader(ct_dataset_h5(img_dir = img_dir, train = train), batch_size=batch_size, shuffle=True,
+                    num_workers = 8,pin_memory=False)
+    return loader
 
 class ct_dataset(data.Dataset):
     def __init__(self, img_dir, train = True, transform=None, target_transform=None):
@@ -61,4 +71,32 @@ class ct_dataset(data.Dataset):
         # if self.target_transform:
         #     label = self.target_transform(label)
         return img, label
+    
+class ct_dataset_h5(data.Dataset):
+    def __init__(self, img_dir, train = True, transform=None, target_transform=None):
+        self.img_dir = img_dir
+        self.transform = transform
+        self.target_transform = target_transform
+        
+    def __len__(self):
+        with h5py.File(self.img_dir, 'r') as f:
+            # 假设您想要读取名为'dataset_1'的数据集
+            lenth = len(f["images"])
+        return lenth
+
+    def __getitem__(self, idx):
+        # 打开HDF5文件
+        with h5py.File(self.img_dir, 'r') as f:
+            # 假设您想要读取名为'dataset_1'的数据集
+            images = f["images"]
+            labels_ds = f["labels"]
+            labels_class = f["labels_class"]
+            # 选择数据集的某个区域（从第1到第10行，从第20到第30列）
+            img = images[idx] 
+            label_d = labels_ds[idx]
+            label_class = labels_class[idx]
+            # print("dataset description\n  " + f.attrs['description'])
+        # images.attrs['description'] = 'Myocardial+Ischemic_h5py'
+        # labels_ds.attrs['description'] = 'Label dataset'
+        return img, label_d, label_class
     
